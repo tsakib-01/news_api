@@ -39,7 +39,6 @@ const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
 const PER_FEED_CAP = 25;
 const FETCH_TIMEOUT_MS = 8000;
-const SUMMARY_MAX = 250;
 
 const FALLBACK_IMAGES = {
   world: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80",
@@ -51,6 +50,8 @@ const FALLBACK_IMAGES = {
 
 const USER_AGENT =
   "Mozilla/5.0 (compatible; GlobalNewsAPI/1.0; +https://vercel.com) RSS-Aggregator";
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
 const parser = new Parser({
   customFields: {
@@ -64,7 +65,7 @@ const parser = new Parser({
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Helpers: text                                                             */
+/*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
 
 function stripHtml(input = "") {
@@ -83,21 +84,15 @@ function stripHtml(input = "") {
 
 function cleanSummary(raw) {
   let text = stripHtml(raw);
-  // Remove common boilerplate appended by feeds
-  text = text
+  return text
     .replace(/\s*(The post .+? appeared first on .+?\.?|Read more\.{0,3}|Continue reading\.{0,3}|\[…\]|\[\.\.\.\])\s*$/i, "")
     .trim();
-  if (text.length <= SUMMARY_MAX) return text;
-  const cut = text.slice(0, SUMMARY_MAX);
-  const lastSpace = cut.lastIndexOf(" ");
-  return (lastSpace > 150 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:\-–—\s]+$/, "") + "…";
 }
 
 function cleanAuthor(item, sourceName) {
   let author = item.creator || item.dcCreator || item.author || "";
   if (Array.isArray(author)) author = author.join(", ");
   author = stripHtml(String(author));
-  // "email@site.com (Jane Doe)" -> "Jane Doe"
   const paren = author.match(/\(([^)]+)\)/);
   if (paren && author.includes("@")) author = paren[1];
   author = author.replace(/<?[^\s<>]+@[^\s<>]+>?/g, "").replace(/^by\s+/i, "").trim();
@@ -114,7 +109,7 @@ function canonicalUrl(link) {
     if (u.protocol === "http:") u.protocol = "https:";
     return u.toString();
   } catch {
-    return null;
+    return String(link || "");
   }
 }
 
@@ -143,7 +138,6 @@ function toHttps(raw, base) {
   }
 }
 
-// BBC's feeds serve 240px thumbnails; swap the size segment for a larger one.
 function upscale(url) {
   return url.replace(/(ichef\.bbci\.co\.uk\/(?:news|ace\/standard)\/)\d+(\/)/, "$1976$2");
 }
@@ -162,10 +156,7 @@ function firstImgFromHtml(html) {
   let m;
   while ((m = regex.exec(html))) {
     const src = m[1];
-    // skip tracking pixels / tiny icons / emoji
     if (/(pixel|tracker|beacon|1x1|spacer|emoji|avatar|logo)/i.test(src)) continue;
-    const w = m[0].match(/\bwidth\s*=\s*["']?(\d+)/i);
-    if (w && Number(w[1]) < 50) continue;
     return src;
   }
   return null;
@@ -173,25 +164,20 @@ function firstImgFromHtml(html) {
 
 function extractImage(item, category) {
   const candidates = [];
+  const media = item.mediaContent || [];
+  for (const m of Array.isArray(media) ? media : [media]) {
+    const attrs = m?.$ || m || {};
+    if (attrs.url && isImageNode(attrs)) candidates.push(attrs.url);
+  }
+  const enc = item.enclosure;
+  if (enc?.url && isImageNode(enc)) candidates.push(enc.url);
 
-  // 1. <media:content> – prefer widest
-  const mc = (item.mediaContent || [])
-    .map((n) => n?.$ || {})
-    .filter((a) => a.url && isImageNode(a))
-    .sort((a, b) => Number(b.width || 0) - Number(a.width || 0));
-  mc.forEach((a) => candidates.push(a.url));
+  const thumbs = item.mediaThumbnail || [];
+  for (const t of Array.isArray(thumbs) ? thumbs : [thumbs]) {
+    const attrs = t?.$ || t || {};
+    if (attrs.url) candidates.push(attrs.url);
+  }
 
-  // 2. <enclosure>
-  if (item.enclosure?.url && isImageNode(item.enclosure)) candidates.push(item.enclosure.url);
-
-  // 3. <media:thumbnail> – prefer widest
-  (item.mediaThumbnail || [])
-    .map((n) => n?.$ || {})
-    .filter((a) => a.url)
-    .sort((a, b) => Number(b.width || 0) - Number(a.width || 0))
-    .forEach((a) => candidates.push(a.url));
-
-  // 4. inline <img> in body HTML
   const htmlImg =
     firstImgFromHtml(item.contentEncoded) ||
     firstImgFromHtml(item["content:encoded"]) ||
@@ -205,6 +191,53 @@ function extractImage(item, category) {
     if (https) return upscale(https);
   }
   return FALLBACK_IMAGES[category] || FALLBACK_IMAGES.world;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  AI Full Story Synthesis (Gemini)                                          */
+/* -------------------------------------------------------------------------- */
+
+async function synthesizeFullStory(title, summary, sourceName) {
+  if (!GEMINI_API_KEY) return null;
+  const prompt = `You are a world-class wire service journalist. Expand this verified news report into an authoritative 3-paragraph news article.
+Headline: ${title}
+Wire Source: ${sourceName}
+Verified Facts: ${summary}
+
+Format strictly with these 3 sections:
+WHAT OCCURRED:
+(1st paragraph detailing the events and key actors)
+
+WHY THIS MATTERS:
+(2nd paragraph detailing global context, implications, and impact)
+
+OUTLOOK & WHAT'S NEXT:
+(3rd paragraph detailing upcoming statements, proceedings, or developments)
+
+Maintain strictly neutral, formal, factual broadsheet tone. Do not fabricate unverifiable statistics.`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 550, temperature: 0.3 },
+        }),
+      }
+    );
+    clearTimeout(timeout);
+    if (!resp.ok) return null;
+    const json = await resp.json();
+    return json?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch {
+    return null;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -278,6 +311,17 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Handle single article synthesis: GET /api/news?expand=true&title=...&summary=...&source=...
+  if (req.query?.expand === "true") {
+    const title = String(req.query.title || "");
+    const summary = String(req.query.summary || "");
+    const source = String(req.query.source || "");
+    const fullStory = await synthesizeFullStory(title, summary, source);
+    res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=600");
+    res.status(200).json({ fullStory: fullStory || summary });
+    return;
+  }
+
   const requested = String(req.query?.category || DEFAULT_CATEGORY).toLowerCase().trim();
   const category = FEEDS[requested] ? requested : DEFAULT_CATEGORY;
 
@@ -296,14 +340,12 @@ export default async function handler(req, res) {
     else errors.push({ source: feeds[i].name, url: feeds[i].url, reason: r.reason?.message || "Unknown error" });
   });
 
-  // De-duplicate by id (same URL syndicated by multiple feeds)
   const seen = new Set();
   const articles = merged
     .filter((a) => (seen.has(a.id) ? false : seen.add(a.id)))
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
     .slice(0, limit);
 
-  // Every feed failed -> don't let the CDN cache an error
   if (articles.length === 0) {
     res.setHeader("Cache-Control", "no-store");
     res.status(502).json({
