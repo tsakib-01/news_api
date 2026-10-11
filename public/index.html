@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global News API - Live Engine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; line-height: 1.5; }
+    .container { max-width: 900px; margin: auto; }
+    header { margin-bottom: 2rem; border-bottom: 1px solid #334155; padding-bottom: 1.5rem; }
+    h1 { font-size: 2rem; color: #38bdf8; margin-bottom: 0.5rem; }
+    p { color: #94a3b8; font-size: 1rem; }
+    .badge { display: inline-block; background: #0284c7; color: white; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: bold; margin-bottom: 0.75rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.25rem; color: #f1f5f9; margin-bottom: 1rem; }
+    ul { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+    li a { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 1.05rem; background: #0f172a; padding: 8px 12px; border-radius: 6px; display: inline-block; border: 1px solid #334155; }
+    li a:hover { background: #38bdf8; color: #0f172a; }
+    pre { background: #0f172a; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; color: #a5f3fc; border: 1px solid #334155; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">API Status: Online & Live</span>
+      <h1>Worldwide News API Engine</h1>
+      <p>Your automated backend is running successfully on Vercel. Below are your live API endpoints ready for your Blogspot website.</p>
+    </header>
+
+    <div class="card">
+      <h2>🚀 Live Endpoints (Click to test):</h2>
+      <ul>
+        <li><a href="/api/news?category=world" target="_blank">GET /api/news?category=world</a> (BBC, Al Jazeera, DW)</li>
+        <li><a href="/api/news?category=ai" target="_blank">GET /api/news?category=ai</a> (TechCrunch AI, The Verge)</li>
+        <li><a href="/api/news?category=tech" target="_blank">GET /api/news?category=tech</a> (The Verge, WIRED)</li>
+        <li><a href="/api/news?category=sports" target="_blank">GET /api/news?category=sports</a> (BBC Sport, ESPN)</li>
+        <li><a href="/api/news?category=politics" target="_blank">GET /api/news?category=politics</a> (BBC, The Guardian, NPR)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>📌 How to Use in Blogspot:</h2>
+      <pre>fetch("/api/news?category=world&limit=10")
+  .then(res => res.json())
+  .then(data => console.log(data.articles));</pre>
+    </div>
+  </div>
+</body>
+</html>
