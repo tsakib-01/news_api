@@ -9,26 +9,28 @@ import { createHash } from "node:crypto";
 const FEEDS = {
   world: [
     { name: "BBC News", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
-    { name: "Al Jazeera English", url: "https://www.aljazeera.com/xml/rss/all.xml" },
-    { name: "Deutsche Welle", url: "https://rss.dw.com/xml/rss-en-world" },
+    { name: "The New York Times", url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml" },
+    { name: "The Guardian", url: "https://www.theguardian.com/world/rss" },
   ],
   ai: [
-    { name: "TechCrunch", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
-    { name: "The Verge", url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" },
+    { name: "TechCrunch AI", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
+    { name: "The Verge AI", url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" },
+    { name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index" },
   ],
   tech: [
     { name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
-    { name: "WIRED", url: "https://www.wired.com/feed/category/science/latest/rss" },
+    { name: "WIRED", url: "https://www.wired.com/feed/rss" },
+    { name: "Engadget", url: "https://www.engadget.com/rss.xml" },
   ],
   sports: [
     { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml" },
+    { name: "The Guardian Sport", url: "https://www.theguardian.com/sport/rss" },
     { name: "ESPN", url: "https://www.espn.com/espn/rss/news" },
   ],
-  // Reuters discontinued its public RSS feeds in 2020, so we use other Tier-1 outlets.
   politics: [
     { name: "BBC News", url: "https://feeds.bbci.co.uk/news/politics/rss.xml" },
     { name: "The Guardian", url: "https://www.theguardian.com/politics/rss" },
-    { name: "NPR", url: "https://feeds.npr.org/1014/rss.xml" },
+    { name: "The New York Times", url: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml" },
   ],
 };
 
